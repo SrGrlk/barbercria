@@ -35,8 +35,8 @@ const BARBER_CREDENTIALS = {
 };
 
 // CONFIGURAÇÃO DO SUPABASE (Opcional - insira seus dados para ativar a sincronização em tempo real)
-const SUPABASE_URL = '';
-const SUPABASE_KEY = '';
+const SUPABASE_URL = 'https://pwakhgxpodfmoxkrivtm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_4Uc0LSayx6iXex1J43xbMg_B4iqTVXO';
 let supabase = null;
 
 if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
