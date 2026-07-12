@@ -34,6 +34,16 @@ const BARBER_CREDENTIALS = {
   'admin': { password: 'Admin123', name: 'Administrador', id: 'admin', role: 'admin' }
 };
 
+// CONFIGURAÇÃO DO SUPABASE (Opcional - insira seus dados para ativar a sincronização em tempo real)
+const SUPABASE_URL = '';
+const SUPABASE_KEY = '';
+let supabase = null;
+
+if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
+  const { createClient } = window.supabase;
+  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
 // ESTADOS GLOBAIS DO SITE
 let selectedBarber = null;
 let selectedServiceIds = [];
@@ -42,6 +52,150 @@ let selectedTime = null;
 let currentStep = 1;
 let activeDashboardFilter = 'all';
 let deferredPrompt = null;
+
+// SINCRONIZAÇÃO E REALTIME COM SUPABASE
+async function syncFromSupabase() {
+  if (!supabase) return;
+  try {
+    console.log('Iniciando sincronização com o Supabase...');
+    
+    // 1. Clientes
+    const { data: clientsData, error: clientsError } = await supabase.from('clients').select('*');
+    if (!clientsError && clientsData) {
+      localStorage.setItem('clients', JSON.stringify(clientsData));
+    }
+    
+    // 2. Despesas
+    const { data: expensesData, error: expensesError } = await supabase.from('expenses').select('*');
+    if (!expensesError && expensesData) {
+      localStorage.setItem('expenses', JSON.stringify(expensesData));
+    }
+    
+    // 3. Agendamentos
+    const { data: appointmentsData, error: appointmentsError } = await supabase.from('appointments').select('*');
+    if (!appointmentsError && appointmentsData) {
+      localStorage.setItem('appointments', JSON.stringify(appointmentsData));
+    }
+
+    console.log('Sincronização concluída com sucesso!');
+    renderCatalog();
+    renderAppointments();
+    checkAuthSession();
+    
+    const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
+    if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
+      renderBarberDashboard();
+    }
+  } catch (err) {
+    console.error('Erro na sincronização automática:', err);
+  }
+}
+
+function setupSupabaseSubscriptions() {
+  if (!supabase) return;
+
+  // Realtime para appointments
+  supabase
+    .channel('public:appointments')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, payload => {
+      console.log('Change received for appointments:', payload);
+      let appointments = JSON.parse(localStorage.getItem('appointments') || '[]');
+      const eventType = payload.eventType;
+      const newRecord = payload.new;
+      const oldRecord = payload.old;
+
+      if (eventType === 'INSERT') {
+        if (!appointments.some(a => a.id === newRecord.id)) {
+          appointments.push(newRecord);
+          const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
+          if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin') && newRecord.status === 'scheduled') {
+            showNotificationToast(
+              'Novo Agendamento Recebido!',
+              `O cliente <strong>${newRecord.clientName}</strong> agendou com <strong>${newRecord.barberName}</strong> para o dia <strong>${formatDateString(newRecord.date)}</strong> às <strong>${newRecord.time}</strong>.`
+            );
+          }
+        }
+      } else if (eventType === 'UPDATE') {
+        appointments = appointments.map(a => a.id === newRecord.id ? newRecord : a);
+      } else if (eventType === 'DELETE') {
+        appointments = appointments.filter(a => a.id !== oldRecord.id);
+      }
+
+      localStorage.setItem('appointments', JSON.stringify(appointments));
+      renderAppointments();
+      const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
+      if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
+        renderBarberDashboard();
+      }
+    })
+    .subscribe();
+
+  // Realtime para clients
+  supabase
+    .channel('public:clients')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, payload => {
+      console.log('Change received for clients:', payload);
+      let clients = JSON.parse(localStorage.getItem('clients') || '[]');
+      const eventType = payload.eventType;
+      const newRecord = payload.new;
+      const oldRecord = payload.old;
+
+      if (eventType === 'INSERT') {
+        if (!clients.some(c => c.name.toLowerCase() === newRecord.name.toLowerCase())) {
+          clients.push(newRecord);
+        }
+      } else if (eventType === 'UPDATE') {
+        clients = clients.map(c => c.name.toLowerCase() === newRecord.name.toLowerCase() ? newRecord : c);
+        const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
+        if (loggedUser && loggedUser.role === 'client' && loggedUser.name.toLowerCase() === newRecord.name.toLowerCase() && newRecord.blocked) {
+          alert('Esta conta foi bloqueada por um administrador.');
+          logoutUser();
+        }
+      } else if (eventType === 'DELETE') {
+        clients = clients.filter(c => c.name.toLowerCase() !== oldRecord.name.toLowerCase());
+        const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
+        if (loggedUser && loggedUser.role === 'client' && loggedUser.name.toLowerCase() === oldRecord.name.toLowerCase()) {
+          alert('Sua conta foi excluída por um administrador.');
+          logoutUser();
+        }
+      }
+
+      localStorage.setItem('clients', JSON.stringify(clients));
+      const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
+      if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
+        renderBarberDashboard();
+      }
+    })
+    .subscribe();
+
+  // Realtime para expenses
+  supabase
+    .channel('public:expenses')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, payload => {
+      console.log('Change received for expenses:', payload);
+      let expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
+      const eventType = payload.eventType;
+      const newRecord = payload.new;
+      const oldRecord = payload.old;
+
+      if (eventType === 'INSERT') {
+        if (!expenses.some(e => e.id === newRecord.id)) {
+          expenses.push(newRecord);
+        }
+      } else if (eventType === 'UPDATE') {
+        expenses = expenses.map(e => e.id === newRecord.id ? newRecord : e);
+      } else if (eventType === 'DELETE') {
+        expenses = expenses.filter(e => e.id !== oldRecord.id);
+      }
+
+      localStorage.setItem('expenses', JSON.stringify(expenses));
+      const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
+      if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
+        renderBarberDashboard();
+      }
+    })
+    .subscribe();
+}
 
 // INICIALIZAÇÃO
 document.addEventListener('DOMContentLoaded', () => {
@@ -62,6 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(reg => console.log('Service Worker registrado:', reg.scope))
       .catch(err => console.error('Erro Service Worker:', err));
+  }
+
+  // Inicializa sincronização e realtime se o Supabase estiver configurado
+  if (supabase) {
+    syncFromSupabase();
+    setupSupabaseSubscriptions();
   }
 });
 
@@ -98,7 +258,7 @@ function clearDashboardDOM() {
 function switchTab(tabId) {
   // Protege o acesso ao painel de controle (dashboard)
   if (tabId === 'dashboard') {
-    const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+    const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
     if (!loggedUser || (loggedUser.role !== 'barber' && loggedUser.role !== 'admin')) {
       switchTab('home');
       return;
@@ -121,7 +281,7 @@ function switchTab(tabId) {
 
   // Atualiza classes do menu desktop
   const desktopBtns = ['home', 'catalog', 'appointments', 'dashboard'];
-  const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+  const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
   const isAdmin = loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin');
 
   desktopBtns.forEach(btn => {
@@ -222,7 +382,7 @@ function handleLoginSubmit(event) {
       name: barber.name,
       id: barber.id
     };
-    sessionStorage.setItem('loggedUser', JSON.stringify(sessionUser));
+    localStorage.setItem('loggedUser', JSON.stringify(sessionUser));
     checkAuthSession();
     closeLogin();
     switchTab('dashboard');
@@ -242,7 +402,7 @@ function handleLoginSubmit(event) {
       role: 'client',
       name: client.name
     };
-    sessionStorage.setItem('loggedUser', JSON.stringify(sessionUser));
+    localStorage.setItem('loggedUser', JSON.stringify(sessionUser));
     checkAuthSession();
     closeLogin();
     switchTab('home');
@@ -251,7 +411,7 @@ function handleLoginSubmit(event) {
   }
 }
 
-function handleRegisterSubmit(event) {
+async function handleRegisterSubmit(event) {
   event.preventDefault();
   
   const name = document.getElementById('reg-name').value.trim();
@@ -268,7 +428,25 @@ function handleRegisterSubmit(event) {
   }
 
   // Cadastra novo cliente (apenas nome e senha)
-  const newClient = { name, password };
+  const newClient = { name, password, blocked: false };
+
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .insert([newClient]);
+      if (error) {
+        console.error('Erro ao cadastrar cliente no Supabase:', error);
+        alert('Erro ao realizar cadastro no servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error('Falha de rede ao cadastrar cliente:', e);
+      alert('Erro de conexão ao realizar cadastro.');
+      return;
+    }
+  }
+
   clients.push(newClient);
   localStorage.setItem('clients', JSON.stringify(clients));
 
@@ -277,7 +455,7 @@ function handleRegisterSubmit(event) {
     role: 'client',
     name
   };
-  sessionStorage.setItem('loggedUser', JSON.stringify(sessionUser));
+  localStorage.setItem('loggedUser', JSON.stringify(sessionUser));
   
   checkAuthSession();
   closeLogin();
@@ -285,13 +463,13 @@ function handleRegisterSubmit(event) {
 }
 
 function logoutUser() {
-  sessionStorage.removeItem('loggedUser');
+  localStorage.removeItem('loggedUser');
   checkAuthSession();
   switchTab('home');
 }
 
 function checkAuthSession() {
-  const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+  const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
   
   const navTrigger = document.getElementById('btn-login-trigger');
   const navTriggerMobile = document.getElementById('btn-login-trigger-mobile');
@@ -392,7 +570,7 @@ function renderAppointments() {
   const container = document.getElementById('appointments-container');
   if (!container) return;
 
-  const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+  const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
 
   // Se não estiver logado, avisa que precisa de conta
   if (!loggedUser) {
@@ -466,7 +644,7 @@ function renderAppointments() {
                 <i data-lucide="${paymentIcon}" class="w-3.5 h-3.5 text-gold-500"></i> Pagamento: ${paymentText}
               </span>
               <span class="flex items-center gap-1 text-gold-500 font-bold">
-                Total: R$ ${app.totalPrice.toFixed(2)}
+                Total: R$ ${(app.totalPrice || 0).toFixed(2)}
               </span>
             </div>
           </div>
@@ -489,7 +667,9 @@ function renderAppointments() {
 }
 
 function formatDateString(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return '';
   const parts = dateStr.split('-');
+  if (parts.length < 3) return dateStr;
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
@@ -498,7 +678,7 @@ function formatDateString(dateStr) {
    ========================================================================== */
 function openBooking(initialServiceId = null) {
   // 1. Trava de segurança: exige login antes de abrir agendamento
-  const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+  const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
   if (!loggedUser) {
     alert('Por favor, faça login ou crie uma conta para agendar um horário.');
     openLogin();
@@ -836,7 +1016,7 @@ function renderReviewData() {
 /* ==========================================================================
    CONFIRMAÇÃO E WHATSAPP REDIRECT
    ========================================================================== */
-function confirmBooking() {
+async function confirmBooking() {
   const nameInput = document.getElementById('client-name');
   const phoneInput = document.getElementById('client-phone');
   
@@ -851,7 +1031,7 @@ function confirmBooking() {
   // Guarda o telefone localmente para autocompletar na próxima vez
   localStorage.setItem('clientPhone', clientPhone);
 
-  const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+  const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
   const barber = BARBERS[selectedBarber];
   const servicesSelected = selectedServiceIds.map(id => HAIRCUTS.find(c => c.id === id)).filter(Boolean);
   const total = servicesSelected.reduce((sum, s) => sum + s.price, 0);
@@ -873,6 +1053,23 @@ function confirmBooking() {
     paymentMethod: paymentMethod,
     status: 'scheduled'
   };
+
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .insert([newApp]);
+      if (error) {
+        console.error('Erro ao salvar agendamento no Supabase:', error);
+        alert('Erro ao salvar agendamento no servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao salvar agendamento.');
+      return;
+    }
+  }
 
   // Carrega agendamentos existentes, adiciona e salva
   const appointments = JSON.parse(localStorage.getItem('appointments') || '[]');
@@ -931,8 +1128,26 @@ Confirma meu agendamento?`;
   return `https://wa.me/${barber.phone}?text=${encodeURIComponent(text)}`;
 }
 
-function cancelAppointment(appId) {
+async function cancelAppointment(appId) {
   if (!confirm('Deseja realmente cancelar este agendamento?')) return;
+
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', appId);
+      if (error) {
+        console.error('Erro ao cancelar agendamento no Supabase:', error);
+        alert('Erro ao cancelar agendamento no servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao cancelar agendamento.');
+      return;
+    }
+  }
 
   let appointments = JSON.parse(localStorage.getItem('appointments') || '[]');
   appointments = appointments.map(app => {
@@ -943,8 +1158,8 @@ function cancelAppointment(appId) {
 
   // Recarrega
   renderAppointments();
-  if (sessionStorage.getItem('loggedUser')) {
-    const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+  if (localStorage.getItem('loggedUser')) {
+    const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
     if (loggedUser.role === 'barber' || loggedUser.role === 'admin') {
       renderBarberDashboard();
     }
@@ -955,7 +1170,7 @@ function cancelAppointment(appId) {
    PAINEL DO BARBEIRO (BARBER DASHBOARD)
    ========================================================================== */
 function renderBarberDashboard() {
-  const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+  const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
   if (!loggedUser || (loggedUser.role !== 'barber' && loggedUser.role !== 'admin')) return;
 
   // Renderiza Caixa e Finanças
@@ -992,7 +1207,8 @@ function renderDashboardClients() {
   // Ordena por nome
   clients.sort((a, b) => a.name.localeCompare(b.name));
 
-  container.innerHTML = clients.map(client => {
+  container.innerHTML = '';
+  clients.forEach(client => {
     const isBlocked = client.blocked === true;
     const blockBtnText = isBlocked ? 'Desbloquear' : 'Bloquear';
     const blockBtnClass = isBlocked 
@@ -1002,8 +1218,9 @@ function renderDashboardClients() {
       ? `<span class="bg-rose-500/10 text-rose-500 text-[10px] font-black uppercase px-2 py-0.5 rounded italic">Bloqueado</span>`
       : `<span class="bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase px-2 py-0.5 rounded italic">Ativo</span>`;
 
-    return `
-      <div class="bg-stone-950 border border-stone-850 p-4 rounded-2xl flex flex-col justify-between gap-3 shadow-md">
+    const card = document.createElement('div');
+    card.className = "bg-stone-950 border border-stone-850 p-4 rounded-2xl flex flex-col justify-between gap-3 shadow-md";
+    card.innerHTML = `
         <div class="flex items-center justify-between gap-2">
           <div class="truncate">
             <span class="font-bold text-white uppercase italic text-sm tracking-tight block truncate">${client.name}</span>
@@ -1018,28 +1235,67 @@ function renderDashboardClients() {
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
           </button>
         </div>
-      </div>
     `;
-  }).join('');
+    container.appendChild(card);
+  });
 
   lucide.createIcons();
 }
 
-function toggleBlockClient(clientName) {
+async function toggleBlockClient(clientName) {
   let clients = JSON.parse(localStorage.getItem('clients') || '[]');
+  let targetClient = null;
   clients = clients.map(c => {
     if (c.name.toLowerCase() === clientName.toLowerCase()) {
       c.blocked = !c.blocked;
+      targetClient = c;
     }
     return c;
   });
+
+  if (supabase && targetClient) {
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ blocked: targetClient.blocked })
+        .eq('name', targetClient.name);
+      if (error) {
+        console.error('Erro ao atualizar status do cliente no Supabase:', error);
+        alert('Erro ao sincronizar alteração com o servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao atualizar cliente.');
+      return;
+    }
+  }
+
   localStorage.setItem('clients', JSON.stringify(clients));
   renderBarberDashboard();
   showNotificationToast('Cadastro Atualizado', `Status do cliente <strong>${clientName}</strong> foi alterado.`);
 }
 
-function removeClient(clientName) {
+async function removeClient(clientName) {
   if (!confirm(`Deseja realmente excluir permanentemente a conta do cliente "${clientName}"?`)) return;
+
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .delete()
+        .eq('name', clientName);
+      if (error) {
+        console.error('Erro ao excluir cliente no Supabase:', error);
+        alert('Erro ao excluir cliente no servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao excluir cliente.');
+      return;
+    }
+  }
 
   let clients = JSON.parse(localStorage.getItem('clients') || '[]');
   clients = clients.filter(c => c.name.toLowerCase() !== clientName.toLowerCase());
@@ -1056,10 +1312,10 @@ function renderFinancialMetrics() {
   // Faturamento = soma de todos os finalizados (completed)
   const revenue = appointments
     .filter(app => app.status === 'completed')
-    .reduce((sum, app) => sum + app.totalPrice, 0);
+    .reduce((sum, app) => sum + ((app.totalPrice || 0) || 0), 0);
 
   // Despesas = soma das saídas cadastradas
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const totalExpenses = expenses.reduce((sum, exp) => sum + ((exp.amount || 0) || 0), 0);
 
   // Lucro líquido
   const profit = revenue - totalExpenses;
@@ -1100,7 +1356,7 @@ function renderExpenses() {
         <span class="text-[10px] text-stone-500">${formatDateString(exp.date)}</span>
       </div>
       <div class="flex items-center gap-3">
-        <span class="text-xs text-rose-500 font-bold">- R$ ${exp.amount.toFixed(2)}</span>
+        <span class="text-xs text-rose-500 font-bold">- R$ ${((exp.amount || 0)).toFixed(2)}</span>
         <button onclick="deleteExpense(${exp.id})" class="text-stone-500 hover:text-red-500 transition-colors p-1" title="Excluir">
           <i data-lucide="x" class="w-3.5 h-3.5"></i>
         </button>
@@ -1110,7 +1366,7 @@ function renderExpenses() {
   lucide.createIcons();
 }
 
-function addExpense(event) {
+async function addExpense(event) {
   event.preventDefault();
 
   const descInput = document.getElementById('expense-desc');
@@ -1130,6 +1386,23 @@ function addExpense(event) {
     date: today
   };
 
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .insert([newExpense]);
+      if (error) {
+        console.error('Erro ao adicionar despesa no Supabase:', error);
+        alert('Erro ao salvar despesa no servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao salvar despesa.');
+      return;
+    }
+  }
+
   const expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
   expenses.push(newExpense);
   localStorage.setItem('expenses', JSON.stringify(expenses));
@@ -1141,8 +1414,26 @@ function addExpense(event) {
   renderBarberDashboard();
 }
 
-function deleteExpense(id) {
+async function deleteExpense(id) {
   if (!confirm('Excluir esta saída?')) return;
+
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', id);
+      if (error) {
+        console.error('Erro ao excluir despesa no Supabase:', error);
+        alert('Erro ao excluir despesa no servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao excluir despesa.');
+      return;
+    }
+  }
 
   let expenses = JSON.parse(localStorage.getItem('expenses') || '[]');
   expenses = expenses.filter(exp => exp.id !== id);
@@ -1209,7 +1500,7 @@ function renderDashboardAppointments() {
             <span>Cliente: <strong class="text-stone-300 font-medium">${app.clientName}</strong> (${app.clientPhone})</span>
             <span>Atendente: <strong class="text-stone-300 font-medium">${app.barberName}</strong></span>
             <span>Data/Hora: <strong class="text-stone-300 font-medium">${formatDateString(app.date)} às ${app.time}</strong></span>
-            <span class="text-gold-500">Valor: R$ ${app.totalPrice.toFixed(2)} <span class="text-[10px] text-stone-500 font-bold uppercase tracking-wider">(${paymentText})</span></span>
+            <span class="text-gold-500">Valor: R$ ${(app.totalPrice || 0).toFixed(2)} <span class="text-[10px] text-stone-500 font-bold uppercase tracking-wider">(${paymentText})</span></span>
           </div>
         </div>
         
@@ -1229,7 +1520,25 @@ function renderDashboardAppointments() {
   lucide.createIcons();
 }
 
-function completeAppointment(appId) {
+async function completeAppointment(appId) {
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'completed' })
+        .eq('id', appId);
+      if (error) {
+        console.error('Erro ao concluir agendamento no Supabase:', error);
+        alert('Erro ao concluir agendamento no servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao concluir agendamento.');
+      return;
+    }
+  }
+
   let appointments = JSON.parse(localStorage.getItem('appointments') || '[]');
   appointments = appointments.map(app => {
     if (app.id === appId) {
@@ -1244,8 +1553,26 @@ function completeAppointment(appId) {
   renderAppointments();
 }
 
-function deleteDashboardAppointment(appId) {
+async function deleteDashboardAppointment(appId) {
   if (!confirm('Deseja cancelar este agendamento permanentemente?')) return;
+
+  if (supabase) {
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('id', appId);
+      if (error) {
+        console.error('Erro ao cancelar agendamento no Supabase:', error);
+        alert('Erro ao cancelar agendamento no servidor.');
+        return;
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Erro de conexão ao cancelar agendamento.');
+      return;
+    }
+  }
 
   let appointments = JSON.parse(localStorage.getItem('appointments') || '[]');
   appointments = appointments.map(app => {
@@ -1339,7 +1666,7 @@ function showNotificationToast(title, message) {
 // Ouvinte de eventos Storage para atualizações de abas
 window.addEventListener('storage', (event) => {
   if (event.key === 'appointments') {
-    const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+    const loggedUser = JSON.parse(localStorage.getItem('loggedUser'));
     if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
       const oldApps = JSON.parse(event.oldValue || '[]');
       const newApps = JSON.parse(event.newValue || '[]');
