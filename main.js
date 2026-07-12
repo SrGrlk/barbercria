@@ -49,8 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
   checkAuthSession();
   lucide.createIcons();
   
-  // Set default date string to today
+  // Set default date string to today (or Monday if today is Sunday)
   const today = new Date();
+  if (today.getDay() === 0) {
+    today.setDate(today.getDate() + 1);
+  }
   selectedDateStr = today.toISOString().split('T')[0];
 });
 
@@ -103,15 +106,26 @@ function switchTab(tabId) {
 
   // Atualiza classes do menu desktop
   const desktopBtns = ['home', 'catalog', 'appointments', 'dashboard'];
+  const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+  const isAdmin = loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin');
+
   desktopBtns.forEach(btn => {
     const el = document.getElementById(`nav-${btn}`);
     const mel = document.getElementById(`m-nav-${btn}`);
+    
+    // Se for o painel e o usuário não for admin, mantém oculto e não processa classes normais
+    if (btn === 'dashboard' && !isAdmin) {
+      if (el) el.className = "hidden text-sm font-medium transition-colors text-stone-400 hover:text-white";
+      if (mel) mel.className = "hidden w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400";
+      return;
+    }
+
     if (btn === tabId) {
       if (el) el.className = "text-sm font-medium transition-colors text-gold-500";
-      if (mel) mel.className = "block w-full text-left text-xl font-black uppercase italic tracking-tighter text-gold-500";
+      if (mel) mel.className = "w-full text-left text-xl font-black uppercase italic tracking-tighter text-gold-500";
     } else {
       if (el) el.className = "text-sm font-medium transition-colors text-stone-400 hover:text-white";
-      if (mel) mel.className = "block w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400";
+      if (mel) mel.className = "w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400";
     }
   });
 
@@ -205,6 +219,10 @@ function handleLoginSubmit(event) {
   const client = clients.find(c => c.name.toLowerCase() === usernameInput.toLowerCase());
   
   if (client && client.password === passwordInput) {
+    if (client.blocked) {
+      alert('Esta conta foi bloqueada por um administrador.');
+      return;
+    }
     const sessionUser = {
       role: 'client',
       name: client.name
@@ -723,17 +741,28 @@ function renderDatesGrid() {
     current.setDate(today.getDate() + i);
     const dateStr = current.toISOString().split('T')[0];
     const isSelected = selectedDateStr === dateStr;
+    const isSunday = current.getDay() === 0;
 
-    datesHtml += `
-      <button onclick="selectDate('${dateStr}')" id="date-btn-${dateStr}" class="date-btn flex flex-col items-center justify-center p-3 rounded-xl border text-xs transition-all ${
-        isSelected 
-        ? 'border-gold-500 bg-gold-500/10 text-gold-500' 
-        : 'border-stone-800 bg-stone-950 text-stone-300 hover:border-stone-700'
-      }">
-        <span class="text-[10px] font-bold text-stone-500 uppercase">${dayNames[current.getDay()]}</span>
-        <span class="text-base font-black mt-0.5">${current.getDate()}</span>
-      </button>
-    `;
+    if (isSunday) {
+      datesHtml += `
+        <button class="flex flex-col items-center justify-center p-3 rounded-xl border text-xs transition-all border-stone-900/50 bg-stone-900/10 text-stone-600 cursor-not-allowed" disabled>
+          <span class="text-[9px] font-bold text-stone-600 uppercase">${dayNames[current.getDay()]}</span>
+          <span class="text-base font-black mt-0.5">${current.getDate()}</span>
+          <span class="text-[8px] font-bold text-rose-500/70 uppercase">Fechado</span>
+        </button>
+      `;
+    } else {
+      datesHtml += `
+        <button onclick="selectDate('${dateStr}')" id="date-btn-${dateStr}" class="date-btn flex flex-col items-center justify-center p-3 rounded-xl border text-xs transition-all ${
+          isSelected 
+          ? 'border-gold-500 bg-gold-500/10 text-gold-500' 
+          : 'border-stone-800 bg-stone-950 text-stone-300 hover:border-stone-700'
+        }">
+          <span class="text-[10px] font-bold text-stone-500 uppercase">${dayNames[current.getDay()]}</span>
+          <span class="text-base font-black mt-0.5">${current.getDate()}</span>
+        </button>
+      `;
+    }
   }
 
   grid.innerHTML = datesHtml;
@@ -909,6 +938,89 @@ function renderBarberDashboard() {
   
   // Renderiza Lista de Agendamentos
   renderDashboardAppointments();
+
+  // Renderiza Lista de Clientes
+  renderDashboardClients();
+}
+
+function renderDashboardClients() {
+  const container = document.getElementById('dashboard-clients-list');
+  const countEl = document.getElementById('dashboard-clients-count');
+  if (!container) return;
+
+  const clients = JSON.parse(localStorage.getItem('clients') || '[]');
+  
+  if (countEl) {
+    countEl.innerText = `${clients.length} ${clients.length === 1 ? 'Cliente' : 'Clientes'}`;
+  }
+
+  if (clients.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full text-center py-8 text-xs text-stone-500 italic">
+        Nenhum cliente cadastrado.
+      </div>
+    `;
+    return;
+  }
+
+  // Ordena por nome
+  clients.sort((a, b) => a.name.localeCompare(b.name));
+
+  container.innerHTML = clients.map(client => {
+    const isBlocked = client.blocked === true;
+    const blockBtnText = isBlocked ? 'Desbloquear' : 'Bloquear';
+    const blockBtnClass = isBlocked 
+      ? 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-500 hover:text-white' 
+      : 'bg-amber-500/10 hover:bg-amber-500 text-amber-500 hover:text-white';
+    const blockBadge = isBlocked 
+      ? `<span class="bg-rose-500/10 text-rose-500 text-[10px] font-black uppercase px-2 py-0.5 rounded italic">Bloqueado</span>`
+      : `<span class="bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase px-2 py-0.5 rounded italic">Ativo</span>`;
+
+    return `
+      <div class="bg-stone-950 border border-stone-850 p-4 rounded-2xl flex flex-col justify-between gap-3 shadow-md">
+        <div class="flex items-center justify-between gap-2">
+          <div class="truncate">
+            <span class="font-bold text-white uppercase italic text-sm tracking-tight block truncate">${client.name}</span>
+          </div>
+          ${blockBadge}
+        </div>
+        <div class="flex items-center gap-2 mt-1">
+          <button onclick="toggleBlockClient('${client.name}')" class="flex-1 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-colors ${blockBtnClass}">
+            ${blockBtnText}
+          </button>
+          <button onclick="removeClient('${client.name}')" class="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white p-2 rounded-xl transition-all" title="Remover Cliente">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  lucide.createIcons();
+}
+
+function toggleBlockClient(clientName) {
+  let clients = JSON.parse(localStorage.getItem('clients') || '[]');
+  clients = clients.map(c => {
+    if (c.name.toLowerCase() === clientName.toLowerCase()) {
+      c.blocked = !c.blocked;
+    }
+    return c;
+  });
+  localStorage.setItem('clients', JSON.stringify(clients));
+  renderBarberDashboard();
+  showNotificationToast('Cadastro Atualizado', `Status do cliente <strong>${clientName}</strong> foi alterado.`);
+}
+
+function removeClient(clientName) {
+  if (!confirm(`Deseja realmente excluir permanentemente a conta do cliente "${clientName}"?`)) return;
+
+  let clients = JSON.parse(localStorage.getItem('clients') || '[]');
+  clients = clients.filter(c => c.name.toLowerCase() !== clientName.toLowerCase());
+  localStorage.setItem('clients', JSON.stringify(clients));
+  
+  renderBarberDashboard();
+  showNotificationToast('Cliente Removido', `A conta de <strong>${clientName}</strong> foi deletada.`);
 }
 
 function renderFinancialMetrics() {
