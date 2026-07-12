@@ -27,10 +27,11 @@ const TIME_SLOTS = [
   '16:00', '16:30', '17:00', '17:30', '18:00', '18:30'
 ];
 
-// CREDENCIAIS DE LOGIN DE BARBEIRO
+// CREDENCIAIS DE LOGIN DE BARBEIRO / ADMIN
 const BARBER_CREDENTIALS = {
-  'betaodocorte': { password: 'Admin123', name: 'Betão', id: 'betao' },
-  'thdocorte': { password: 'Admin123', name: 'Th', id: 'th' }
+  'betaodocorte': { password: 'Admin123', name: 'Betão', id: 'betao', role: 'barber' },
+  'thdocorte': { password: 'Admin123', name: 'Th', id: 'th', role: 'barber' },
+  'admin': { password: 'Admin123', name: 'Administrador', id: 'admin', role: 'admin' }
 };
 
 // ESTADOS GLOBAIS DO SITE
@@ -57,6 +58,15 @@ document.addEventListener('DOMContentLoaded', () => {
    NAVEGAÇÃO E ABAS
    ========================================================================== */
 function switchTab(tabId) {
+  // Protege o acesso ao painel de controle (dashboard)
+  if (tabId === 'dashboard') {
+    const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
+    if (!loggedUser || (loggedUser.role !== 'barber' && loggedUser.role !== 'admin')) {
+      switchTab('home');
+      return;
+    }
+  }
+
   // Esconde todas as abas
   document.querySelectorAll('.tab-section').forEach(section => {
     section.classList.add('hidden');
@@ -153,11 +163,11 @@ function handleLoginSubmit(event) {
   const passwordInput = document.getElementById('login-password').value;
   const errorMsg = document.getElementById('login-error-msg');
   
-  // 1. Verifica se é Barbeiro
+  // 1. Verifica se é Barbeiro ou Admin
   const barber = BARBER_CREDENTIALS[usernameInput];
   if (barber && barber.password === passwordInput) {
     const sessionUser = {
-      role: 'barber',
+      role: barber.role || 'barber',
       username: usernameInput,
       name: barber.name,
       id: barber.id
@@ -247,7 +257,7 @@ function checkAuthSession() {
       navLogged.classList.remove('hidden');
       navLogged.classList.add('flex');
       
-      const roleLabel = loggedUser.role === 'barber' ? 'Barbeiro' : 'Cliente';
+      const roleLabel = loggedUser.role === 'barber' ? 'Barbeiro' : (loggedUser.role === 'admin' ? 'Admin' : 'Cliente');
       document.getElementById('user-nav-role').innerText = roleLabel;
       document.getElementById('user-nav-name').innerText = loggedUser.name;
     }
@@ -257,13 +267,13 @@ function checkAuthSession() {
       navLoggedMobile.classList.remove('hidden');
       navLoggedMobile.classList.add('flex');
       
-      const roleLabel = loggedUser.role === 'barber' ? 'Barbeiro' : 'Cliente';
+      const roleLabel = loggedUser.role === 'barber' ? 'Barbeiro' : (loggedUser.role === 'admin' ? 'Admin' : 'Cliente');
       document.getElementById('user-nav-role-mobile').innerText = roleLabel;
       document.getElementById('user-nav-name-mobile').innerText = loggedUser.name;
     }
 
     // Exibe abas baseadas nas permissões do papel
-    if (loggedUser.role === 'barber') {
+    if (loggedUser.role === 'barber' || loggedUser.role === 'admin') {
       if (navDash) navDash.classList.remove('hidden');
       if (mNavDash) mNavDash.classList.remove('hidden');
       
@@ -350,7 +360,7 @@ function renderAppointments() {
   // Filtra apenas agendamentos do cliente logado (exclui cancelados)
   const appointments = allAppointments.filter(app => 
     app.status !== 'cancelled' && 
-    (loggedUser.role === 'barber' || app.clientName.toLowerCase() === loggedUser.name.toLowerCase())
+    (loggedUser.role === 'barber' || loggedUser.role === 'admin' || app.clientName.toLowerCase() === loggedUser.name.toLowerCase())
   );
 
   if (appointments.length === 0) {
@@ -792,8 +802,8 @@ function confirmBooking() {
   appointments.push(newApp);
   localStorage.setItem('appointments', JSON.stringify(appointments));
 
-  // Se o agendamento foi feito por um barbeiro, avisa na tela
-  if (loggedUser && loggedUser.role === 'barber') {
+  // Se o agendamento foi feito por um barbeiro ou admin, avisa na tela
+  if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
     showNotificationToast(
       'Agendamento Criado!',
       `O agendamento para <strong>${newApp.clientName}</strong> foi criado com sucesso.`
@@ -819,7 +829,7 @@ function confirmBooking() {
 
   // Atualiza painéis
   renderAppointments();
-  if (loggedUser && loggedUser.role === 'barber') {
+  if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
     renderBarberDashboard();
   }
   lucide.createIcons();
@@ -856,7 +866,7 @@ function cancelAppointment(appId) {
   renderAppointments();
   if (sessionStorage.getItem('loggedUser')) {
     const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
-    if (loggedUser.role === 'barber') {
+    if (loggedUser.role === 'barber' || loggedUser.role === 'admin') {
       renderBarberDashboard();
     }
   }
@@ -867,7 +877,7 @@ function cancelAppointment(appId) {
    ========================================================================== */
 function renderBarberDashboard() {
   const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
-  if (!loggedUser || loggedUser.role !== 'barber') return;
+  if (!loggedUser || (loggedUser.role !== 'barber' && loggedUser.role !== 'admin')) return;
 
   // Renderiza Caixa e Finanças
   renderFinancialMetrics();
@@ -1167,7 +1177,7 @@ function showNotificationToast(title, message) {
 window.addEventListener('storage', (event) => {
   if (event.key === 'appointments') {
     const loggedUser = JSON.parse(sessionStorage.getItem('loggedUser'));
-    if (loggedUser && loggedUser.role === 'barber') {
+    if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
       const oldApps = JSON.parse(event.oldValue || '[]');
       const newApps = JSON.parse(event.newValue || '[]');
       
