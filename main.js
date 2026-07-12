@@ -81,7 +81,7 @@ function ensureDashboardDOM() {
       if (btn) btn.classList.remove('hidden');
     }
     
-    lucide.createIcons({ root: section });
+    lucide.createIcons();
   }
 }
 
@@ -113,10 +113,10 @@ function switchTab(tabId) {
   });
   
   // Mostra a aba selecionada
-  const activeSection = document.getElementById(`section-${tabId}`);
-  if (activeSection) {
-    activeSection.classList.remove('hidden');
-    activeSection.classList.add('block');
+  const activeSectionEl = document.getElementById(`section-${tabId}`);
+  if (activeSectionEl) {
+    activeSectionEl.classList.remove('hidden');
+    activeSectionEl.classList.add('block');
   }
 
   // Atualiza classes do menu desktop
@@ -156,10 +156,7 @@ function switchTab(tabId) {
   
   // Scroll to top
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  const activeSection = document.getElementById(`section-${tabId}`);
-  if (activeSection) {
-    lucide.createIcons({ root: activeSection });
-  }
+  lucide.createIcons();
 }
 
 function toggleMobileMenu() {
@@ -206,8 +203,7 @@ function toggleAuthView(view) {
     document.getElementById('reg-name').value = '';
     document.getElementById('reg-password').value = '';
   }
-  const modal = document.getElementById('login-modal');
-  if (modal) lucide.createIcons({ root: modal });
+  lucide.createIcons();
 }
 
 function handleLoginSubmit(event) {
@@ -363,14 +359,7 @@ function checkAuthSession() {
     if (navDash) navDash.classList.add('hidden');
     if (mNavDash) mNavDash.classList.add('hidden');
   }
-  const userNav = document.getElementById('user-logged-nav');
-  if (userNav && !userNav.classList.contains('hidden')) {
-    lucide.createIcons({ root: userNav });
-  }
-  const userNavMobile = document.getElementById('user-logged-nav-mobile');
-  if (userNavMobile && !userNavMobile.classList.contains('hidden')) {
-    lucide.createIcons({ root: userNavMobile });
-  }
+  lucide.createIcons();
 }
 
 /* ==========================================================================
@@ -419,7 +408,7 @@ function renderAppointments() {
         </button>
       </div>
     `;
-    lucide.createIcons({ root: container });
+    lucide.createIcons();
     return;
   }
 
@@ -496,7 +485,7 @@ function renderAppointments() {
     `;
   }).join('');
   
-  lucide.createIcons({ root: container });
+  lucide.createIcons();
 }
 
 function formatDateString(dateStr) {
@@ -674,8 +663,7 @@ function updateModalStep() {
   }
 
   validateNavigation();
-  const modal = document.getElementById('booking-modal');
-  if (modal) lucide.createIcons({ root: modal });
+  lucide.createIcons();
 }
 
 function validateNavigation() {
@@ -743,7 +731,7 @@ function renderModalServices() {
       </div>
     `;
   }).join('');
-  lucide.createIcons({ root: list });
+  lucide.createIcons();
 }
 
 function updateServicesTotal() {
@@ -921,7 +909,7 @@ function confirmBooking() {
   if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
     renderBarberDashboard();
   }
-  lucide.createIcons({ root: stepSuccess });
+  lucide.createIcons();
 }
 
 function getWhatsAppLink(app) {
@@ -1034,7 +1022,7 @@ function renderDashboardClients() {
     `;
   }).join('');
 
-  lucide.createIcons({ root: container });
+  lucide.createIcons();
 }
 
 function toggleBlockClient(clientName) {
@@ -1119,7 +1107,7 @@ function renderExpenses() {
       </div>
     </div>
   `).join('');
-  lucide.createIcons({ root: list });
+  lucide.createIcons();
 }
 
 function addExpense(event) {
@@ -1238,7 +1226,7 @@ function renderDashboardAppointments() {
       </div>
     `;
   }).join('');
-  lucide.createIcons({ root: container });
+  lucide.createIcons();
 }
 
 function completeAppointment(appId) {
@@ -1331,7 +1319,7 @@ function showNotificationToast(title, message) {
   `;
 
   container.appendChild(toast);
-  lucide.createIcons({ root: toast });
+  lucide.createIcons();
 
   // Som de notificação
   playNotificationSound();
@@ -1389,7 +1377,7 @@ function showInstallButton() {
   const btn = document.getElementById('btn-install-app');
   if (btn) {
     btn.classList.remove('hidden');
-    lucide.createIcons({ root: btn });
+    lucide.createIcons();
   }
 }
 
