@@ -110,20 +110,20 @@
     <!-- Mobile menu -->
     <div id="mobile-menu" class="hidden md:hidden bg-stone-900 border-b border-stone-800">
       <div class="px-6 py-6 space-y-4">
-        <button onclick="switchTab('home'); toggleMobileMenu();" class="block w-full text-left text-xl font-black uppercase italic tracking-tighter text-gold-500" id="m-nav-home">
+        <button onclick="switchTab('home')" class="block w-full text-left text-xl font-black uppercase italic tracking-tighter text-gold-500" id="m-nav-home">
           Início
         </button>
-        <button onclick="switchTab('catalog'); toggleMobileMenu();" class="block w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400" id="m-nav-catalog">
+        <button onclick="switchTab('catalog')" class="block w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400" id="m-nav-catalog">
           Catálogo
         </button>
-        <button onclick="switchTab('appointments'); toggleMobileMenu();" class="block w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400" id="m-nav-appointments">
+        <button onclick="switchTab('appointments')" class="block w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400" id="m-nav-appointments">
           Meus Agendamentos
         </button>
         <!-- Mobile Dashboard Link (hidden by default) -->
-        <button id="m-nav-dashboard" onclick="switchTab('dashboard'); toggleMobileMenu();" class="hidden w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400">
+        <button id="m-nav-dashboard" onclick="switchTab('dashboard')" class="hidden w-full text-left text-xl font-black uppercase italic tracking-tighter text-stone-400">
           Painel Barber
         </button>
-
+ 
         <div class="pt-4 border-t border-stone-800">
           <button id="btn-login-trigger-mobile" onclick="openLogin(); toggleMobileMenu();" class="w-full bg-stone-850 text-stone-200 py-3 rounded-xl font-bold uppercase tracking-wider text-xs transition-colors flex items-center justify-center gap-1.5">
             <i data-lucide="lock" class="w-4 h-4"></i> Entrar
@@ -133,7 +133,7 @@
               <p id="user-nav-role-mobile" class="text-[9px] font-bold text-stone-500 uppercase tracking-widest leading-none mb-1">Cliente</p>
               <p id="user-nav-name-mobile" class="font-bold text-white uppercase italic text-sm">Nome</p>
             </div>
-            <button onclick="logoutUser(); toggleMobileMenu();" class="py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl font-bold uppercase text-xs tracking-wider transition-colors">
+            <button onclick="logoutUser()" class="py-2.5 px-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl font-bold uppercase text-xs tracking-wider transition-colors">
               Sair
             </button>
           </div>

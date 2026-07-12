@@ -41,6 +41,7 @@ let selectedDateStr = '';
 let selectedTime = null;
 let currentStep = 1;
 let activeDashboardFilter = 'all';
+let deferredPrompt = null;
 
 // INICIALIZAÇÃO
 document.addEventListener('DOMContentLoaded', () => {
@@ -1377,7 +1378,6 @@ window.addEventListener('storage', (event) => {
 /* ==========================================================================
    SUPORTE PARA INSTALAÇÃO PWA
    ========================================================================== */
-let deferredPrompt = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
