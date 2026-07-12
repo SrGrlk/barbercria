@@ -57,6 +57,26 @@ document.addEventListener('DOMContentLoaded', () => {
 /* ==========================================================================
    NAVEGAÇÃO E ABAS
    ========================================================================== */
+function ensureDashboardDOM() {
+  const section = document.getElementById('section-dashboard');
+  const template = document.getElementById('dashboard-template');
+  if (section && template && !section.querySelector('.dashboard-content')) {
+    const clone = template.content.cloneNode(true);
+    section.appendChild(clone);
+    lucide.createIcons();
+  }
+}
+
+function clearDashboardDOM() {
+  const section = document.getElementById('section-dashboard');
+  if (section) {
+    const content = section.querySelector('.dashboard-content');
+    if (content) {
+      content.remove();
+    }
+  }
+}
+
 function switchTab(tabId) {
   // Protege o acesso ao painel de controle (dashboard)
   if (tabId === 'dashboard') {
@@ -65,6 +85,7 @@ function switchTab(tabId) {
       switchTab('home');
       return;
     }
+    ensureDashboardDOM();
   }
 
   // Esconde todas as abas
@@ -274,12 +295,14 @@ function checkAuthSession() {
 
     // Exibe abas baseadas nas permissões do papel
     if (loggedUser.role === 'barber' || loggedUser.role === 'admin') {
+      ensureDashboardDOM();
       if (navDash) navDash.classList.remove('hidden');
       if (mNavDash) mNavDash.classList.remove('hidden');
       
       const badge = document.getElementById('dashboard-barber-badge');
       if (badge) badge.innerText = loggedUser.name;
     } else {
+      clearDashboardDOM();
       if (navDash) navDash.classList.add('hidden');
       if (mNavDash) mNavDash.classList.add('hidden');
     }
@@ -298,7 +321,8 @@ function checkAuthSession() {
       navLoggedMobile.classList.remove('flex');
     }
 
-    // Esconde painel administrativo
+    // Esconde painel administrativo e remove o HTML
+    clearDashboardDOM();
     if (navDash) navDash.classList.add('hidden');
     if (mNavDash) mNavDash.classList.add('hidden');
   }
