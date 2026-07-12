@@ -538,6 +538,27 @@
             </div>
           </div>
 
+          <!-- Payment Method Selection -->
+          <div class="mb-6">
+            <label class="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-2.5">Forma de Pagamento</label>
+            <div class="grid grid-cols-2 gap-4">
+              <label class="flex items-center justify-between p-4 bg-stone-950 border border-stone-850 rounded-2xl cursor-pointer hover:border-gold-500 transition-colors">
+                <div class="flex items-center gap-3">
+                  <input type="radio" name="payment-method" value="pix" class="text-gold-500 focus:ring-gold-500 bg-stone-900 border-stone-800" checked />
+                  <span class="text-sm font-bold uppercase italic text-white tracking-tight">PIX</span>
+                </div>
+                <i data-lucide="qr-code" class="w-4 h-4 text-gold-500"></i>
+              </label>
+              <label class="flex items-center justify-between p-4 bg-stone-950 border border-stone-850 rounded-2xl cursor-pointer hover:border-gold-500 transition-colors">
+                <div class="flex items-center gap-3">
+                  <input type="radio" name="payment-method" value="dinheiro" class="text-gold-500 focus:ring-gold-500 bg-stone-900 border-stone-800" />
+                  <span class="text-sm font-bold uppercase italic text-white tracking-tight">Dinheiro</span>
+                </div>
+                <i data-lucide="banknote" class="w-4 h-4 text-gold-500"></i>
+              </label>
+            </div>
+          </div>
+
           <div class="bg-stone-950 border border-stone-850 rounded-2xl p-5 space-y-3">
             <h4 class="text-xs font-black uppercase tracking-widest text-gold-500 mb-1">Revisão do Pedido</h4>
             <div class="flex justify-between text-sm">

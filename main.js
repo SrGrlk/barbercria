@@ -426,6 +426,8 @@ function renderAppointments() {
     const dateFormatted = formatDateString(app.date);
     const statusText = app.status === 'completed' ? 'Concluído' : 'Agendado';
     const statusClass = app.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gold-500/10 text-gold-400';
+    const paymentText = app.paymentMethod === 'dinheiro' ? 'Dinheiro' : 'PIX';
+    const paymentIcon = app.paymentMethod === 'dinheiro' ? 'banknote' : 'qr-code';
     
     return `
       <div class="bg-stone-900 border border-stone-800 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -444,6 +446,9 @@ function renderAppointments() {
               </span>
               <span class="flex items-center gap-1">
                 <i data-lucide="calendar" class="w-3.5 h-3.5 text-gold-500"></i> ${dateFormatted} às ${app.time}
+              </span>
+              <span class="flex items-center gap-1">
+                <i data-lucide="${paymentIcon}" class="w-3.5 h-3.5 text-gold-500"></i> Pagamento: ${paymentText}
               </span>
               <span class="flex items-center gap-1 text-gold-500 font-bold">
                 Total: R$ ${app.totalPrice.toFixed(2)}
@@ -836,6 +841,9 @@ function confirmBooking() {
   const servicesSelected = selectedServiceIds.map(id => HAIRCUTS.find(c => c.id === id)).filter(Boolean);
   const total = servicesSelected.reduce((sum, s) => sum + s.price, 0);
 
+  const paymentMethodInput = document.querySelector('input[name="payment-method"]:checked');
+  const paymentMethod = paymentMethodInput ? paymentMethodInput.value : 'pix';
+
   const newApp = {
     id: `app_${Date.now()}`,
     clientName,
@@ -847,6 +855,7 @@ function confirmBooking() {
     totalPrice: total,
     date: selectedDateStr,
     time: selectedTime,
+    paymentMethod: paymentMethod,
     status: 'scheduled'
   };
 
@@ -890,6 +899,7 @@ function confirmBooking() {
 
 function getWhatsAppLink(app) {
   const barber = BARBERS[app.barberId];
+  const paymentText = app.paymentMethod === 'dinheiro' ? 'Dinheiro' : 'PIX';
   const text = `Olá, *${barber.name}*! Acabei de agendar um horário com você pela Barbercria.
 
 *Detalhes do Agendamento:*
@@ -899,6 +909,7 @@ function getWhatsAppLink(app) {
 - *Data:* ${formatDateString(app.date)}
 - *Horário:* ${app.time}
 - *Valor Total:* R$ ${app.totalPrice.toFixed(2)}
+- *Forma de Pagamento:* ${paymentText}
 
 Confirma meu agendamento?`;
 
@@ -1169,6 +1180,7 @@ function renderDashboardAppointments() {
 
   container.innerHTML = filtered.map(app => {
     const isCompleted = app.status === 'completed';
+    const paymentText = app.paymentMethod === 'dinheiro' ? 'Dinheiro' : 'PIX';
     return `
       <div class="bg-stone-950 border border-stone-850 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1182,7 +1194,7 @@ function renderDashboardAppointments() {
             <span>Cliente: <strong class="text-stone-300 font-medium">${app.clientName}</strong> (${app.clientPhone})</span>
             <span>Atendente: <strong class="text-stone-300 font-medium">${app.barberName}</strong></span>
             <span>Data/Hora: <strong class="text-stone-300 font-medium">${formatDateString(app.date)} às ${app.time}</strong></span>
-            <span class="text-gold-500">Valor: R$ ${app.totalPrice.toFixed(2)}</span>
+            <span class="text-gold-500">Valor: R$ ${app.totalPrice.toFixed(2)} <span class="text-[10px] text-stone-500 font-bold uppercase tracking-wider">(${paymentText})</span></span>
           </div>
         </div>
         
