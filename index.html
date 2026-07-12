@@ -2,8 +2,16 @@
 <html lang="pt-BR" class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Barbercria | Domine seu Visual</title>
+
+  <!-- PWA Metadata -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0c0a09" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Barbercria" />
+  <link rel="apple-touch-icon" href="betao.png" />
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -289,6 +297,17 @@
                 Nome
               </span>
             </div>
+          </div>
+
+          <!-- PWA Install Card (Hidden by default, shown via JS if install prompt is available) -->
+          <div id="btn-install-app" class="hidden bg-gradient-to-r from-gold-600 to-gold-500 text-stone-950 rounded-3xl p-6 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <h4 class="text-lg font-black uppercase italic tracking-tighter">Instalar Barbercria no Celular</h4>
+              <p class="text-xs font-medium text-stone-900 mt-1">Instale o aplicativo na sua tela inicial para acessar o painel instantaneamente sem abrir o navegador.</p>
+            </div>
+            <button onclick="installPWA()" class="w-full sm:w-auto bg-stone-950 text-gold-400 hover:text-white px-6 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest italic transition-all active:scale-95 flex items-center justify-center gap-2">
+              <i data-lucide="download" class="w-4 h-4"></i> Instalar App
+            </button>
           </div>
 
           <!-- Financial Metrics Grid -->

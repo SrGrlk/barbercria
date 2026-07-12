@@ -55,6 +55,13 @@ document.addEventListener('DOMContentLoaded', () => {
     today.setDate(today.getDate() + 1);
   }
   selectedDateStr = today.toISOString().split('T')[0];
+
+  // Registrar Service Worker para PWA
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('Service Worker registrado:', reg.scope))
+      .catch(err => console.error('Erro Service Worker:', err));
+  }
 });
 
 /* ==========================================================================
@@ -66,7 +73,14 @@ function ensureDashboardDOM() {
   if (section && template && !section.querySelector('.dashboard-content')) {
     const clone = template.content.cloneNode(true);
     section.appendChild(clone);
-    lucide.createIcons();
+    
+    // Mostra o botão de instalar PWA se o prompt nativo já estiver disponível
+    if (deferredPrompt) {
+      const btn = section.querySelector('#btn-install-app');
+      if (btn) btn.classList.remove('hidden');
+    }
+    
+    lucide.createIcons({ root: section });
   }
 }
 
@@ -141,7 +155,10 @@ function switchTab(tabId) {
   
   // Scroll to top
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  lucide.createIcons();
+  const activeSection = document.getElementById(`section-${tabId}`);
+  if (activeSection) {
+    lucide.createIcons({ root: activeSection });
+  }
 }
 
 function toggleMobileMenu() {
@@ -188,7 +205,8 @@ function toggleAuthView(view) {
     document.getElementById('reg-name').value = '';
     document.getElementById('reg-password').value = '';
   }
-  lucide.createIcons();
+  const modal = document.getElementById('login-modal');
+  if (modal) lucide.createIcons({ root: modal });
 }
 
 function handleLoginSubmit(event) {
@@ -344,7 +362,14 @@ function checkAuthSession() {
     if (navDash) navDash.classList.add('hidden');
     if (mNavDash) mNavDash.classList.add('hidden');
   }
-  lucide.createIcons();
+  const userNav = document.getElementById('user-logged-nav');
+  if (userNav && !userNav.classList.contains('hidden')) {
+    lucide.createIcons({ root: userNav });
+  }
+  const userNavMobile = document.getElementById('user-logged-nav-mobile');
+  if (userNavMobile && !userNavMobile.classList.contains('hidden')) {
+    lucide.createIcons({ root: userNavMobile });
+  }
 }
 
 /* ==========================================================================
@@ -393,7 +418,7 @@ function renderAppointments() {
         </button>
       </div>
     `;
-    lucide.createIcons();
+    lucide.createIcons({ root: container });
     return;
   }
 
@@ -415,7 +440,7 @@ function renderAppointments() {
         <p class="text-sm text-stone-400 max-w-xs mx-auto">Você não possui nenhum horário marcado.</p>
       </div>
     `;
-    lucide.createIcons();
+    lucide.createIcons({ root: container });
     return;
   }
 
@@ -470,7 +495,7 @@ function renderAppointments() {
     `;
   }).join('');
   
-  lucide.createIcons();
+  lucide.createIcons({ root: container });
 }
 
 function formatDateString(dateStr) {
@@ -648,7 +673,8 @@ function updateModalStep() {
   }
 
   validateNavigation();
-  lucide.createIcons();
+  const modal = document.getElementById('booking-modal');
+  if (modal) lucide.createIcons({ root: modal });
 }
 
 function validateNavigation() {
@@ -716,7 +742,7 @@ function renderModalServices() {
       </div>
     `;
   }).join('');
-  lucide.createIcons();
+  lucide.createIcons({ root: list });
 }
 
 function updateServicesTotal() {
@@ -894,7 +920,7 @@ function confirmBooking() {
   if (loggedUser && (loggedUser.role === 'barber' || loggedUser.role === 'admin')) {
     renderBarberDashboard();
   }
-  lucide.createIcons();
+  lucide.createIcons({ root: stepSuccess });
 }
 
 function getWhatsAppLink(app) {
@@ -1007,7 +1033,7 @@ function renderDashboardClients() {
     `;
   }).join('');
 
-  lucide.createIcons();
+  lucide.createIcons({ root: container });
 }
 
 function toggleBlockClient(clientName) {
@@ -1092,7 +1118,7 @@ function renderExpenses() {
       </div>
     </div>
   `).join('');
-  lucide.createIcons();
+  lucide.createIcons({ root: list });
 }
 
 function addExpense(event) {
@@ -1211,7 +1237,7 @@ function renderDashboardAppointments() {
       </div>
     `;
   }).join('');
-  lucide.createIcons();
+  lucide.createIcons({ root: container });
 }
 
 function completeAppointment(appId) {
@@ -1304,7 +1330,7 @@ function showNotificationToast(title, message) {
   `;
 
   container.appendChild(toast);
-  lucide.createIcons();
+  lucide.createIcons({ root: toast });
 
   // Som de notificação
   playNotificationSound();
@@ -1347,3 +1373,40 @@ window.addEventListener('storage', (event) => {
     }
   }
 });
+
+/* ==========================================================================
+   SUPORTE PARA INSTALAÇÃO PWA
+   ========================================================================== */
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  showInstallButton();
+});
+
+function showInstallButton() {
+  const btn = document.getElementById('btn-install-app');
+  if (btn) {
+    btn.classList.remove('hidden');
+    lucide.createIcons({ root: btn });
+  }
+}
+
+function installPWA() {
+  if (!deferredPrompt) {
+    alert('O aplicativo já está instalado ou não é suportado pelo seu navegador.');
+    return;
+  }
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then((choiceResult) => {
+    if (choiceResult.outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+    deferredPrompt = null;
+    const btn = document.getElementById('btn-install-app');
+    if (btn) btn.classList.add('hidden');
+  });
+}
