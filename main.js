@@ -1,4 +1,4 @@
-// Garantir que a falha de carregamento da biblioteca Lucide não crashe o script
+﻿// Garantir que a falha de carregamento da biblioteca Lucide não crashe o script
 if (typeof window !== 'undefined' && (!window.lucide || typeof window.lucide.createIcons !== 'function')) {
   window.lucide = {
     createIcons: () => console.warn('Lucide CDN não disponível. Ícones ignorados.')
@@ -54,7 +54,7 @@ const BARBER_CREDENTIALS = {
 };
 
 // CONFIGURAÇÃO DO SUPABASE (Opcional)
-let supabase = null;
+var supabase = null;
 
 // ESTADOS GLOBAIS DO SITE
 let selectedBarber = null;
