@@ -1,6 +1,61 @@
 <!DOCTYPE html>
 <html lang="pt-BR" class="scroll-smooth">
 <head>
+  <!-- Error Logging Helper -->
+  <script>
+    (function() {
+      window.onerror = function(message, source, lineno, colno, error) {
+        var errStr = 'Error: ' + message + ' at ' + (source ? source.split('/').pop() : '') + ':' + lineno + ':' + colno;
+        alert(errStr);
+        return false;
+      };
+      window.onunhandledrejection = function(event) {
+        var errStr = 'Unhandled Rejection: ' + event.reason;
+        alert(errStr);
+      };
+    })();
+  </script>
+  <!-- Cache-busting: Unregisters old service workers and clears old cache -->
+  <script>
+    if (window.location.protocol !== 'file:') {
+      if (!localStorage.getItem('sw_cache_cleaned_v4')) {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            if (registrations && registrations.length > 0) {
+              var promises = [];
+              for (var i = 0; i < registrations.length; i++) {
+                promises.push(registrations[i].unregister());
+              }
+              Promise.all(promises).then(function() {
+                console.log('Old Service Workers unregistered.');
+                if ('caches' in window) {
+                  caches.keys().then(function(keys) {
+                    return Promise.all(keys.map(function(key) {
+                      return caches.delete(key);
+                    }));
+                  }).then(function() {
+                    console.log('Caches cleared.');
+                    localStorage.setItem('sw_cache_cleaned_v4', 'true');
+                    window.location.reload(true);
+                  });
+                } else {
+                  localStorage.setItem('sw_cache_cleaned_v4', 'true');
+                  window.location.reload(true);
+                }
+              });
+            } else {
+              localStorage.setItem('sw_cache_cleaned_v4', 'true');
+            }
+          }).catch(function(e) {
+            console.warn('Service Worker registrations check failed:', e);
+            localStorage.setItem('sw_cache_cleaned_v4', 'true');
+          });
+        } else {
+          localStorage.setItem('sw_cache_cleaned_v4', 'true');
+        }
+      }
+    }
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Barbercria | Domine seu Visual</title>
@@ -16,14 +71,16 @@
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            gold: {
-              400: '#fbbf24',
-              500: '#f59e0b',
-              600: '#d97706',
+    if (typeof tailwind !== 'undefined') {
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              gold: {
+                400: '#fbbf24',
+                500: '#f59e0b',
+                600: '#d97706',
+              }
             }
           }
         }
@@ -712,6 +769,13 @@
 
   <!-- Custom main JS -->
   <script src="main.js"></script>
+  <script>
+    if (window.mainJsLoaded) {
+      console.log('main.js carregado com sucesso!');
+    } else {
+      alert('ERRO: O arquivo main.js NÃO foi carregado ou falhou na compilação!');
+    }
+  </script>
 
 </body>
 </html>
