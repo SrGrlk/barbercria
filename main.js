@@ -1,3 +1,10 @@
+// Garantir que a falha de carregamento da biblioteca Lucide não crashe o script
+if (typeof window !== 'undefined' && (!window.lucide || typeof window.lucide.createIcons !== 'function')) {
+  window.lucide = {
+    createIcons: () => console.warn('Lucide CDN não disponível. Ícones ignorados.')
+  };
+}
+
 // DADOS DO PROJETO (ESTÁTICOS E OFFLINE)
 const HAIRCUTS = [
   { id: 'maquina', name: 'MÁQUINA', description: 'Corte rápido e prático feito inteiramente na máquina.', price: 20 },
@@ -40,8 +47,12 @@ const SUPABASE_KEY = 'sb_publishable_4Uc0LSayx6iXex1J43xbMg_B4iqTVXO';
 let supabase = null;
 
 if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
-  const { createClient } = window.supabase;
-  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  try {
+    const { createClient } = window.supabase;
+    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  } catch (err) {
+    console.error('Erro ao inicializar o cliente Supabase:', err);
+  }
 }
 
 // ESTADOS GLOBAIS DO SITE
@@ -199,10 +210,26 @@ function setupSupabaseSubscriptions() {
 
 // INICIALIZAÇÃO
 document.addEventListener('DOMContentLoaded', () => {
-  renderCatalog();
-  renderAppointments();
-  checkAuthSession();
-  lucide.createIcons();
+  try {
+    renderCatalog();
+  } catch (e) {
+    console.error('Erro ao renderizar catálogo:', e);
+  }
+  try {
+    renderAppointments();
+  } catch (e) {
+    console.error('Erro ao renderizar agendamentos:', e);
+  }
+  try {
+    checkAuthSession();
+  } catch (e) {
+    console.error('Erro ao verificar sessão de autenticação:', e);
+  }
+  try {
+    lucide.createIcons();
+  } catch (e) {
+    console.error('Erro ao criar ícones:', e);
+  }
   
   // Set default date string to today (or Monday if today is Sunday)
   const today = new Date();
@@ -213,15 +240,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Registrar Service Worker para PWA
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('Service Worker registrado:', reg.scope))
-      .catch(err => console.error('Erro Service Worker:', err));
+    try {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registrado:', reg.scope))
+        .catch(err => console.error('Erro Service Worker:', err));
+    } catch (e) {
+      console.error('Erro ao registrar Service Worker:', e);
+    }
   }
 
   // Inicializa sincronização e realtime se o Supabase estiver configurado
   if (supabase) {
-    syncFromSupabase();
-    setupSupabaseSubscriptions();
+    try {
+      syncFromSupabase();
+      setupSupabaseSubscriptions();
+    } catch (e) {
+      console.error('Erro ao inicializar Supabase:', e);
+    }
   }
 });
 
